@@ -1,45 +1,49 @@
-# What is TSVD
+# New Document# What is TSVD
 
-TSVD is a thread-safety violation detecting tool designed in the paper "Efficient and Scalable Thread-Safety Violation Detection --- Finding thousands of concurrency bugs during testing" in SOSP2019.
+TSVD is a thread-safety violation detection tool described in the paper "Efficient and Scalable Thread-Safety Violation Detection --- Finding thousands of concurrency bugs during testing" in SOSP 2019.
 
 ## What is thread-safety violation
 
-Some research results discover that it is fairly common that developers erroneously assume some concurrent accesses on different part of a data structure is thread safe. For example :
+A thread-safety violation occurs when an application concurrently calls into a library/class in a way that violates its thread-safety contract. For example, in .NET, `System.Collections.Generic.Dictionary` is not thread-safe for concurrent accesses when one or both accesses are write operations. Therefore, the following two concurrent operations are not thread-safe.
 
     //Dictionary dict
     Thread1: dict.Add(key1,value);
     Thread2: dict.ContainsKey(key2);
     
-Even key1 is different with key2, it is still possible to lead a undetermined result.
+The above two concurrent operations can give nondeterministic results or corrupt the data structure, even if `key1` and `key2` are different.
 
 ### What kind of class is not thread-safe
 
-In C#, most classes in System.Collections are thread-unsafe unless they are protected by a specific lock.
+In C#, most classes under the `System.Collections` namespace are thread-unsafe unless they are protected by a specific lock.
 
 ## How to apply TSVD
 
 ### Overview
 
-There are only three easy steps to adopt TSVD for your software.
+`TSVD` is designed for .NET applications. It works by instrumenting application binaries and running existing workloads/tests on instrumented binaries. Instrumentation is done by tool called `TSVDInstrumenter.exe`. Compiling the source code in this repo produces `TSVDInstrumenter.exe` in `src/TSVDInstrumenter/bin/Debug`.
 
-+ Compile the TSVD source code. It generates a `TSVDInstrumenter.exe` in `src/TSVDInstrumenter/bin/Debug`.
-+ Instrucment the testing binaries with `TSVDInstrumenter.exe`. The usage of `TSVDInstrumenter.exe` is:
+As mentioned, applying `TSVD` on an application involves two steps:  
 
-    `.\TSVDInstrumenter.exe [directory to the testing binary] [path to instrument configuration] [path to runtime configuration]`
++ Instrument the testing binaries with `TSVDInstrumenter.exe`. The usage of `TSVDInstrumenter.exe` is:
 
-+ Run the test as normal.
+    `.\TSVDInstrumenter.exe [directory containing applicaiton binaries] [path to instrumentation configuration] [path to runtime configuration]`
+
+	The instrumentation configuration file dictates `TSVD`'s instrumentation behavior (e.g., what thread-unsafe APIs are instrumented), while the runtime configuration file contains `TSVD`'s runtime behavior (e.g., what algorithm to use, where to write bug log files, etc.) 
+
++ Run instrumented binaries with existing workloads/tests. If any thread-safety violation is detected, `TSVD` will produce a file named `TSVD-bug-*.tsvdlog` that contains details of the violation.
 
 ### Example
 
-TestApps/DataRace is an example to demonstrate how to apply TSVD:
+The repo contains an example application `TestApps/DataRace` that includes several thread-safety violations (concurrently sorting the same `List`). `TSVD` can be applied on `DataRace.exe` as follows:
 
-+ Preparion. Compile the DataRace source code. It generates a DataRace.exe in `DataRace/bin/Debug`. 
 + Instrumentation. Under DataRace/bin/Debug, run the following command in command line:
 
-    `& ..\..\..\..\src\TSVDInstrumenter\bin\Debug\TSVDInstrumenter.exe . .\Configurations\instrumentation-config.cfg .\Configurations\runtime-config.cfg`. It instruments all the binaries in the current folder. Since there is only one exe/dll in the current folder, it will only instrument `DataRace.exe`.
+    `& ..\..\..\..\src\TSVDInstrumenter\bin\Debug\TSVDInstrumenter.exe . .\Configurations\instrumentation-config.cfg .\Configurations\runtime-config.cfg`. It instruments all the binaries (in this case, only `DataRace.exe`) in the current folder. It will also copy `TSVD` runtime library and runtime configuration file to the current folder.
 
 + Run. After observing the `Instrumentation result: OK` which indicates `DataRace.exe` is already instrumented, run `.\DataRace.exe`. Since running the insturmented `DataRace.exe`, it writes all the detected thread-safety violation to the `TSVD-bug-*.tsvdlog` file.
     
+### Feedback/Questions
+For any question about the tool, please email us at `tsvd_at_microsoft_dot_com`
 
 # Contributing
 
