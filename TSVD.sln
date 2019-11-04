@@ -12,6 +12,10 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TSVDRuntime", "src\TSVDRuntime\TSVDRuntime.csproj", "{92495C65-CD84-478D-93CB-4A9B62EB0B7F}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataRace", "TestApps\DataRace\DataRace.csproj", "{E62A6602-7471-41B6-9F71-F581275FB2C0}"
+	ProjectSection(ProjectDependencies) = postProject
+		{F00C6436-B57B-4AC6-AD93-E4D18CD8F80C} = {F00C6436-B57B-4AC6-AD93-E4D18CD8F80C}
+		{92495C65-CD84-478D-93CB-4A9B62EB0B7F} = {92495C65-CD84-478D-93CB-4A9B62EB0B7F}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -81,11 +81,8 @@ namespace TSVDInstrumenter
 
                     foreach (var method in allMethods)
                     {
-                        bool variableDeclared = false;
+                        bool instrumentedMethod = false;
                         ILProcessor ilProcessor = method.Body.GetILProcessor();
-                        var objVarDefinition = new VariableDefinition(objectType);
-                        var stackVarDefinition = new VariableDefinition(stackType);
-
                         foreach (var instruction in method.Body.Instructions.ToList())
                         {
                             if (instruction.OpCode == OpCodes.Call || instruction.OpCode == OpCodes.Callvirt)
@@ -94,30 +91,40 @@ namespace TSVDInstrumenter
                                 var methodSignature = this.MethodSignatureWithoutReturnType(methodReference.FullName);
                                 if (this.configuration.IsThreadSafetyAPI(methodSignature))
                                 {
-                                    if (!variableDeclared)
+                                    bool hasThis = ((MethodReference)instruction.Operand).HasThis;
+                                    VariableDefinition instanceVarDef = null;
+                                    VariableDefinition stackVarDefinition = null;
+                                    if (hasThis)
                                     {
-                                        method.Body.Variables.Add(objVarDefinition);
+                                        instanceVarDef = new VariableDefinition(objectType);
+                                        stackVarDefinition = new VariableDefinition(stackType);
+                                        method.Body.Variables.Add(instanceVarDef);
                                         method.Body.Variables.Add(stackVarDefinition);
-                                        variableDeclared = true;
+                                        var loadThisInstruction = this.LocateLoadThisInstruction(instruction);
+                                        var storeThisInstruction = ilProcessor.Create(OpCodes.Stloc, instanceVarDef);
+                                        ilProcessor.InsertAfter(loadThisInstruction, storeThisInstruction);  // store "this" to a variable
+                                        ilProcessor.InsertAfter(storeThisInstruction, ilProcessor.Create(OpCodes.Ldloc, instanceVarDef));  // load "this"
                                     }
 
-                                    bool hasThis = ((MethodReference)instruction.Operand).HasThis;
                                     MethodReference apiReference = (MethodReference)instruction.Operand;
-                                    var loadThisInstruction = this.LocateLoadThisInstruction(instruction);
 
                                     List<Instruction> patch = this.InterceptionPatch(
                                         ilProcessor,
                                         hasThis,
-                                        objVarDefinition,
+                                        instanceVarDef,
                                         interceptionMethodRef,
                                         this.MethodSignatureWithoutReturnType(method.FullName),
                                         this.MethodSignatureWithoutReturnType(apiReference.FullName),
                                         instruction.Offset);
-                                    patch.Reverse();
-                                    patch.ForEach(x => ilProcessor.InsertAfter(loadThisInstruction, x));
+                                    patch.ForEach(x => ilProcessor.InsertBefore(instruction, x));
                                     instrumented = true;
+                                    instrumentedMethod = true;
                                 }
                             }
+                        }
+                        if (instrumentedMethod)
+                        {
+                            method.Body.InitLocals = true;
                         }
                     }
                 }
@@ -216,13 +223,13 @@ namespace TSVDInstrumenter
         /// <param name="api">api name.</param>
         /// <param name="ilOffset">IL Offset where the API is called.</param>
         /// <returns>A list of instructions to be inserted.</returns>
-        private List<Instruction> InterceptionPatch(ILProcessor ilProcessor, bool hasThis, VariableDefinition varDefinition, MethodReference interceptionMethodRef, string method, string api, int ilOffset)
+        private List<Instruction> InterceptionPatch(ILProcessor ilProcessor, bool hasThis, VariableDefinition varDefinition,
+            MethodReference interceptionMethodRef, string method, string api, int ilOffset)
         {
             List<Instruction> patch = new List<Instruction>();
             if (hasThis)
             {
-                patch.Add(ilProcessor.Create(OpCodes.Stloc, varDefinition));  // store "this" to a variable
-                patch.Add(ilProcessor.Create(OpCodes.Ldloc, varDefinition));  // load "this"
+                patch.Add(ilProcessor.Create(OpCodes.Ldloc, varDefinition));
             }
             else
             {
@@ -237,18 +244,13 @@ namespace TSVDInstrumenter
                 ilProcessor.Create(OpCodes.Call,  interceptionMethodRef),
             });
 
-            if (hasThis)
-            {
-                patch.Add(ilProcessor.Create(OpCodes.Ldloc, varDefinition)); // after interception method call, load "this" to stack so that the original API can use it
-            }
-
             return patch;
         }
 
         private string MethodSignatureWithoutReturnType(string fullName)
         {
             string[] tokens = fullName.Split(" ".ToCharArray(), StringSplitOptions.RemoveEmptyEntries);
-            return tokens[1].Replace("::", ".");
+            return tokens[1].Replace("::", ".").Replace("get_Item", "Item.get").Replace("set_Item", "Item.set");
         }
     }
 }

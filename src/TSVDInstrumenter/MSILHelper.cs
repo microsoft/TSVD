@@ -24,18 +24,18 @@ namespace TSVDInstrumenter
                 case Code.Br:
                 case Code.Br_S:
                 case Code.Break:
+                case Code.Constrained:
                 case Code.Endfinally:
                 case Code.Jmp:
                 case Code.Leave:
                 case Code.Leave_S:
+                case Code.No:
                 case Code.Nop:
+                case Code.Readonly:
                 case Code.Rethrow:
-                case Code.Constrained:
                 case Code.Tail:
                 case Code.Unaligned:
                 case Code.Volatile:
-                case Code.Readonly:
-                case Code.No:
                     return new Tuple<int, int>(0, 0);
 
                 case Code.Arglist:
@@ -261,17 +261,17 @@ namespace TSVDInstrumenter
                         popped++;
                     }
 
-                    int pushed = method.ReturnType == null ? 0 : 1;
+                    int pushed = method.ReturnType == null || method.ReturnType.FullName == "System.Void" ? 0 : 1;
                     return new Tuple<int, int>(popped, pushed);
                 case Code.Newobj:
                     return new Tuple<int, int>(((MethodReference)instruction.Operand).Parameters.Count, 1);
                 case Code.Ret:
-                    break;
+                    method = (MethodReference)instruction.Operand;
+                    return new Tuple<int, int>(method.ReturnType == null || method.ReturnType.FullName == "System.Void" ? 0 : 1, 0);
+
                 default:
                     throw new Exception("Unknown IL code type " + instruction.OpCode);
             }
-
-            return new Tuple<int, int>(-1, -1);
         }
     }
 }
