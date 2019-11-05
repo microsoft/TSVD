@@ -83,6 +83,7 @@ namespace TSVDInstrumenter
                     {
                         bool instrumentedMethod = false;
                         ILProcessor ilProcessor = method.Body.GetILProcessor();
+                        method.Body.SimplifyMacros();
                         foreach (var instruction in method.Body.Instructions.ToList())
                         {
                             if (instruction.OpCode == OpCodes.Call || instruction.OpCode == OpCodes.Callvirt)
@@ -122,6 +123,8 @@ namespace TSVDInstrumenter
                                 }
                             }
                         }
+
+                        method.Body.OptimizeMacros();
                         if (instrumentedMethod)
                         {
                             method.Body.InitLocals = true;
